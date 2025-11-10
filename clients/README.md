@@ -1,164 +1,183 @@
-# Snapcast Client Configuration
+# Raspberry Pi Zero + DAC+ Zero Client Setup
 
-This directory contains configuration examples for setting up Snapcast clients to connect to your multiroom audio server.
+This guide is specifically for setting up Raspberry Pi Zero W with DAC+ Zero (pHAT DAC) as Snapcast clients.
 
-## Client Setup
+## Hardware
 
-Snapcast clients can run on various platforms including:
-- Raspberry Pi
-- Linux desktop/laptop
-- Android devices
-- Windows
-- macOS
+- Raspberry Pi Zero W
+- DAC+ Zero (pHAT DAC)
+- MicroSD card (8GB+)
+- Power supply
 
 ## Installation
 
-### Debian/Ubuntu/Raspberry Pi OS
+### 1. Install Raspbian Lite
+
+Flash Raspbian Lite to your SD card and boot the Pi Zero.
+
+### 2. Configure DAC+ Zero
+
+The DAC+ Zero needs to be enabled in the boot configuration.
+
+Edit `/boot/config.txt`:
+```bash
+sudo nano /boot/config.txt
+```
+
+Add this line:
+```
+dtoverlay=hifiberry-dac
+```
+
+Comment out the default audio:
+```
+#dtparam=audio=on
+```
+
+Save and reboot:
+```bash
+sudo reboot
+```
+
+### 3. Verify DAC Detection
+
+After reboot, check if the DAC is detected:
+```bash
+aplay -l
+```
+
+You should see:
+```
+card 0: sndrpihifiberry [sndrpihifiberry]
+```
+
+### 4. Install Snapclient
 
 ```bash
-# Install snapclient
 sudo apt-get update
-sudo apt-get install snapclient
+sudo apt-get install -y snapclient
+```
 
-# Start the service
+### 5. Configure Snapclient
+
+Edit the snapclient configuration:
+```bash
+sudo nano /etc/default/snapclient
+```
+
+Set the server IP and audio device (replace `<SERVER_IP>` with your Raspberry Pi 4's IP):
+```
+SNAPCLIENT_OPTS="--host <SERVER_IP> --soundcard hw:CARD=sndrpihifiberry"
+```
+
+### 6. Enable and Start
+
+```bash
 sudo systemctl enable snapclient
 sudo systemctl start snapclient
 ```
 
-### Configuration
+## Verification
 
-Edit the snapclient configuration to point to your server:
+### Check Service Status
+```bash
+sudo systemctl status snapclient
+```
+
+### View Logs
+```bash
+sudo journalctl -u snapclient -f
+```
+
+### Test Audio
+```bash
+speaker-test -c 2 -t wav -D hw:CARD=sndrpihifiberry
+```
+
+You should hear white noise from both channels.
+
+## Troubleshooting
+
+### No Audio Output
+
+1. Verify DAC is recognized:
+   ```bash
+   aplay -l
+   ```
+
+2. Check volume levels:
+   ```bash
+   alsamixer
+   ```
+
+3. Test the DAC directly:
+   ```bash
+   speaker-test -c 2 -t wav -D hw:CARD=sndrpihifiberry
+   ```
+
+### Connection Issues
+
+1. Verify server is reachable:
+   ```bash
+   ping <SERVER_IP>
+   ```
+
+2. Check snapclient logs:
+   ```bash
+   sudo journalctl -u snapclient -f
+   ```
+
+3. Verify correct server IP in config:
+   ```bash
+   cat /etc/default/snapclient
+   ```
+
+### Audio Stuttering on WiFi
+
+If experiencing dropouts over WiFi, increase the latency buffer:
 
 ```bash
 sudo nano /etc/default/snapclient
 ```
 
-Set the server IP address:
+Change to:
 ```
-SNAPCLIENT_OPTS="--host <server-ip>"
+SNAPCLIENT_OPTS="--host <SERVER_IP> --soundcard hw:CARD=sndrpihifiberry --latency 200"
 ```
 
-Restart the service:
+Restart:
 ```bash
 sudo systemctl restart snapclient
 ```
 
-## Example Configurations
+### WiFi Stability
 
-### Raspberry Pi Configuration
-
-See [raspberry-pi/snapclient.conf](raspberry-pi/snapclient.conf) for a complete Raspberry Pi setup.
-
-**Key settings:**
-- Audio output device configuration
-- Buffer settings for optimal latency
-- Volume normalization
-
-### Linux Desktop Configuration
-
-See [linux-desktop/snapclient.conf](linux-desktop/snapclient.conf) for desktop Linux setup.
-
-**Key settings:**
-- PulseAudio integration
-- ALSA device configuration
-- Sample format settings
-
-### Docker Client Configuration
-
-See [docker/docker-compose.yml](docker/docker-compose.yml) for running a client in Docker.
-
-**Use case:** Running a client in a container alongside other services.
-
-## Advanced Configuration
-
-### Latency Tuning
-
-Adjust the buffer size to optimize for your network:
-
+Disable WiFi power saving for better stability:
 ```bash
-# Lower latency (LAN)
-snapclient --host <server-ip> --latency 100
-
-# Higher latency (WiFi or congested network)
-snapclient --host <server-ip> --latency 300
+sudo iw wlan0 set power_save off
 ```
 
-### Audio Device Selection
-
-List available audio devices:
+To make permanent, add to `/etc/rc.local` before `exit 0`:
 ```bash
-snapclient --list
+sudo nano /etc/rc.local
 ```
 
-Specify a particular device:
-```bash
-snapclient --host <server-ip> --soundcard <device-id>
+Add:
 ```
-
-### Volume Control
-
-Set initial volume:
-```bash
-snapclient --host <server-ip> --volume 75
+/sbin/iw wlan0 set power_save off
 ```
-
-## Troubleshooting
-
-### Client Not Connecting
-
-1. Verify server is reachable:
-   ```bash
-   telnet <server-ip> 1704
-   ```
-
-2. Check firewall settings on both server and client
-
-3. Review client logs:
-   ```bash
-   sudo journalctl -u snapclient -f
-   ```
-
-### Audio Stuttering
-
-1. Increase buffer/latency:
-   ```bash
-   snapclient --host <server-ip> --latency 200
-   ```
-
-2. Check network quality:
-   ```bash
-   ping <server-ip>
-   ```
-
-3. Monitor CPU usage on client device
-
-### No Audio Output
-
-1. Verify correct audio device is selected:
-   ```bash
-   snapclient --list
-   ```
-
-2. Check volume levels (both snapclient and system)
-
-3. Test audio device with other applications:
-   ```bash
-   speaker-test -c 2
-   ```
 
 ## Multiple Clients
 
-You can run multiple clients on the same network, each representing a different room or zone. The Snapcast web interface allows you to:
-- Group/ungroup clients for synchronized playback
-- Adjust individual volume levels
-- Mute specific rooms
-- Set delay compensation for acoustic alignment
+Repeat this setup for each room. Each Pi Zero will appear in the Snapcast web interface where you can:
+- Rename clients (e.g., "Living Room", "Kitchen")
+- Group clients for synchronized playback
+- Adjust individual volumes
+- Apply delay compensation for acoustic alignment
 
-## Client Scripts
+## Volume Control
 
-The `scripts/` subdirectory contains helper scripts for:
-- Automatic client installation
-- Configuration generation
-- Service management
-
-See individual script files for usage instructions.
+Control volume through:
+- Snapcast web interface: `http://<SERVER_IP>:1780`
+- Command line: `alsamixer`
+- Physical volume controls on your amplifier/speakers

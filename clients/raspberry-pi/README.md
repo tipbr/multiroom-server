@@ -1,149 +1,96 @@
-# Raspberry Pi Snapclient Setup Guide
+# Raspberry Pi Zero + DAC+ Zero Quick Setup
 
-## Prerequisites
+## What You Need
 
-- Raspberry Pi (any model with audio output)
-- Raspberry Pi OS (formerly Raspbian) installed
-- Network connection to the multiroom server
+- Raspberry Pi Zero W with DAC+ Zero (pHAT DAC) attached
+- Raspbian Lite installed
+- Your Raspberry Pi 4 server IP address
 
-## Installation
+## Quick Setup Steps
 
-1. Update your system:
+### 1. Enable the DAC+ Zero
+
+```bash
+sudo nano /boot/config.txt
+```
+
+Add:
+```
+dtoverlay=hifiberry-dac
+```
+
+Comment out:
+```
+#dtparam=audio=on
+```
+
+Save (Ctrl+X, Y, Enter) and reboot:
+```bash
+sudo reboot
+```
+
+### 2. Install and Configure Snapclient
+
+After reboot:
 ```bash
 sudo apt-get update
-sudo apt-get upgrade -y
-```
-
-2. Install snapclient:
-```bash
 sudo apt-get install -y snapclient
-```
-
-## Configuration
-
-1. Copy the example configuration:
-```bash
-sudo cp snapclient.conf /etc/default/snapclient
-```
-
-2. Edit the configuration to point to your server:
-```bash
 sudo nano /etc/default/snapclient
 ```
 
-Update the `SNAPCLIENT_OPTS` line with your server's IP address:
+Add this line (replace `192.168.1.10` with your Pi 4's IP):
 ```
-SNAPCLIENT_OPTS="--host YOUR_SERVER_IP"
+SNAPCLIENT_OPTS="--host 192.168.1.10 --soundcard hw:CARD=sndrpihifiberry"
 ```
 
-3. Enable and start the service:
+Save and start:
 ```bash
 sudo systemctl enable snapclient
 sudo systemctl start snapclient
 ```
 
-## Audio Output Configuration
+### 3. Verify
 
-### Headphone Jack (3.5mm)
-
-Force audio to the headphone jack:
-```bash
-sudo raspi-config
-# Select: System Options -> Audio -> Headphones
-```
-
-Or set it directly:
-```bash
-amixer cset numid=3 1
-```
-
-### HDMI Audio
-
-Force audio to HDMI:
-```bash
-amixer cset numid=3 2
-```
-
-### USB Audio Device
-
-If using a USB DAC or sound card:
-
-1. List available devices:
-```bash
-aplay -L
-```
-
-2. Update snapclient configuration:
-```bash
-sudo nano /etc/default/snapclient
-```
-
-Add the device parameter:
-```
-SNAPCLIENT_OPTS="--host YOUR_SERVER_IP --soundcard hw:CARD=Device,DEV=0"
-```
-
-Replace `Device` with your USB device name from `aplay -L`.
-
-## Troubleshooting
-
-### Check Service Status
-
+Check if it's running:
 ```bash
 sudo systemctl status snapclient
 ```
 
-### View Logs
-
+Test audio:
 ```bash
-sudo journalctl -u snapclient -f
+speaker-test -c 2 -t wav -D hw:CARD=sndrpihifiberry
 ```
 
-### Test Audio Output
+You should hear test tones. If yes, you're done! The client will appear in your web interface at `http://<pi4-ip>:1780`
 
+## Common Issues
+
+**No audio?**
 ```bash
-speaker-test -c 2 -t wav
-```
+# Check if DAC is detected
+aplay -l
+# Should show: card 0: sndrpihifiberry
 
-### Adjust Volume
-
-Via command line:
-```bash
+# Check volume
 alsamixer
 ```
 
-Or through the Snapcast web interface at `http://SERVER_IP:1780`
-
-## Autostart on Boot
-
-The snapclient service is automatically configured to start on boot. To disable:
+**Can't connect to server?**
 ```bash
-sudo systemctl disable snapclient
+# Verify server is reachable
+ping 192.168.1.10
+
+# Check the logs
+sudo journalctl -u snapclient -f
 ```
 
-To re-enable:
+**WiFi stuttering?**
 ```bash
-sudo systemctl enable snapclient
+sudo nano /etc/default/snapclient
+# Change to:
+SNAPCLIENT_OPTS="--host 192.168.1.10 --soundcard hw:CARD=sndrpihifiberry --latency 200"
+
+sudo systemctl restart snapclient
 ```
 
-## Performance Tips
-
-1. **Reduce Latency**: If on a good wired connection, try lower latency:
-   ```
-   SNAPCLIENT_OPTS="--host YOUR_SERVER_IP --latency 100"
-   ```
-
-2. **Increase Buffer**: If experiencing dropouts on WiFi:
-   ```
-   SNAPCLIENT_OPTS="--host YOUR_SERVER_IP --latency 300"
-   ```
-
-3. **WiFi Power Management**: Disable WiFi power saving for better stability:
-   ```bash
-   sudo iw wlan0 set power_save off
-   ```
-
-   To make permanent, add to `/etc/rc.local`:
-   ```bash
-   /sbin/iw wlan0 set power_save off
-   ```
+That's it! Repeat for each room.

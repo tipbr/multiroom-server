@@ -1,160 +1,226 @@
 # Multiroom Audio Server
 
-A Docker-based multiroom audio server supporting multiple streaming protocols including Spotify (via librespot), AirPlay (via shairport-sync), and Google Cast, synchronized across multiple clients using Snapcast.
+Raspberry Pi 4-based multiroom audio server supporting Spotify, AirPlay, and Google Cast, synchronized across Raspberry Pi Zero clients with DAC+ Zero using Snapcast.
 
-## Features
+## Hardware Requirements
 
-- 🎵 **Spotify Support** - Stream Spotify to your multiroom setup using librespot
-- 🍎 **AirPlay Support** - Cast from any Apple device using AirPlay (via shairport-sync)
-- 📱 **Google Cast Support** - Cast audio from any Google Cast-enabled app (via PulseAudio)
-- 🔊 **Synchronized Playback** - Perfect audio synchronization across multiple rooms using Snapcast
-- 🌐 **mDNS Discovery** - Automatic device discovery on your network
-- 🐳 **Docker Support** - Easy deployment with Docker and Docker Compose
-- 🎛️ **Web Interface** - Control your multiroom setup via the Snapcast web interface
+### Server
+- Raspberry Pi 4 (any RAM variant)
+- MicroSD card (16GB+)
+- Power supply
+- Ethernet connection (recommended)
 
-## Quick Start
+### Clients (per room)
+- Raspberry Pi Zero W
+- DAC+ Zero (pHAT DAC)
+- MicroSD card (8GB+)
+- Power supply
 
-### Prerequisites
+## Software Requirements
 
-- Docker
-- Docker Compose
+- Raspbian Lite on all devices
+- Docker and Docker Compose on the server
 
-### Deployment
+## Server Setup (Raspberry Pi 4)
 
-1. Clone this repository:
+### 1. Install Raspbian Lite
+
+Flash Raspbian Lite to your Pi 4's SD card and boot it up.
+
+### 2. Install Docker
+
+```bash
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker pi
+sudo apt-get install -y docker-compose
+```
+
+Log out and back in for group changes to take effect.
+
+### 3. Install the Multiroom Server
+
 ```bash
 git clone https://github.com/tipbr/multiroom-server.git
 cd multiroom-server
-```
-
-2. Start the server:
-```bash
 docker-compose up -d
 ```
 
-3. Access the Snapcast web interface at `http://localhost:1780`
+The server will start and be accessible at `http://<pi4-ip>:1780`
 
-## Docker Compose Configuration
+## Client Setup (Raspberry Pi Zero + DAC+ Zero)
 
-```yaml
-services:
-  librespot-snapcast:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: librespot-snapcast
-    network_mode: host # Use host networking for better audio performance and mDNS discovery
-    restart: unless-stopped
-    volumes:
-      - /var/run/dbus:/var/run/dbus # Share D-Bus with host for Avahi
-      - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket # Share Avahi socket with host
-    environment:
-      - TZ=UTC # Set your timezone
-    privileged: true # Required for some system-level operations
-    ports:
-      - "1704:1704" # Snapcast server port
-      - "1705:1705" # Snapcast control port
-      - "1780:1780" # Snapcast HTTP server port
-      - "4713:4713" # PulseAudio port for Google Cast
-      - "5353:5353/udp" # Avahi mDNS port
+### 1. Install Raspbian Lite
+
+Flash Raspbian Lite to your Pi Zero's SD card.
+
+### 2. Configure DAC+ Zero
+
+Edit `/boot/config.txt`:
+```bash
+sudo nano /boot/config.txt
 ```
 
-## Configuration
+Add this line:
+```
+dtoverlay=hifiberry-dac
+```
 
-### Server Configuration
+Comment out or remove:
+```
+#dtparam=audio=on
+```
 
-The server configuration is managed in `snapserver.conf`. It defines:
-- Bind address and port
-- Log level
-- Audio stream sources (Spotify, AirPlay, and Google Cast pipes)
+Reboot:
+```bash
+sudo reboot
+```
 
-### Client Configuration
+### 3. Install Snapclient
 
-Client configuration examples are provided in the `clients/` directory. See the [Client Setup Guide](clients/README.md) for detailed instructions on setting up Snapcast clients.
+```bash
+sudo apt-get update
+sudo apt-get install -y snapclient
+```
 
-## Architecture
+### 4. Configure Snapclient
 
-The system consists of three main components:
+Edit the configuration:
+```bash
+sudo nano /etc/default/snapclient
+```
 
-1. **Snapcast Server** - The core synchronization server that manages audio streams
-2. **Audio Sources**:
-   - **librespot** - Spotify client that outputs to a named pipe
-   - **shairport-sync** - AirPlay receiver that outputs to a named pipe
-   - **PulseAudio** - Google Cast receiver that outputs to a named pipe
-3. **Snapcast Clients** - Devices that receive and play synchronized audio
+Replace `<SERVER_IP>` with your Pi 4's IP address:
+```
+SNAPCLIENT_OPTS="--host <SERVER_IP> --soundcard hw:CARD=sndrpihifiberry"
+```
+
+### 5. Start Snapclient
+
+```bash
+sudo systemctl enable snapclient
+sudo systemctl start snapclient
+```
+
+Repeat steps 1-5 for each room/client.
 
 ## Usage
 
 ### Spotify
 
-1. Open Spotify on any device
-2. Look for "Spotify Multiroom" in the available devices
-3. Select it and start playing music
+1. Open Spotify on your phone/computer
+2. Look for "Spotify Multiroom" in available devices
+3. Select it and start playing
 
 ### AirPlay
 
-1. Open any audio app on your iOS/macOS device
-2. Look for "AirPlay Multiroom" in AirPlay devices
-3. Select it and start streaming
+1. Open Control Center on iOS or use AirPlay menu on macOS
+2. Select "AirPlay Multiroom"
+3. Start playing audio
 
 ### Google Cast
 
-1. Open any Google Cast-enabled app on your Android/iOS device or Chrome browser
+1. Open any Cast-enabled app
 2. Tap the Cast icon
-3. Look for the server in the list of available devices (it will appear as a network audio device)
-4. Select it and start casting
+3. Select the multiroom server
+4. Start casting
 
-**Note**: For Google Cast to work, ensure:
-- The server is on the same network as your casting device
-- Port 4713 (PulseAudio) is accessible
-- mDNS/Avahi is functioning properly
+### Web Control
 
-### Web Interface
-
-Access the Snapcast web interface at `http://<server-ip>:1780` to:
-- View connected clients
-- Adjust volume levels
-- Manage audio streams
-- Group/ungroup clients
-
-## Ports
-
-- **1704** - Snapcast server port (TCP)
-- **1705** - Snapcast control port (TCP)
-- **1780** - Snapcast HTTP server / Web interface
-- **4713** - PulseAudio network audio (TCP) - for Google Cast
-- **5353** - Avahi mDNS (UDP)
+Access `http://<pi4-ip>:1780` to:
+- View all connected clients
+- Adjust individual room volumes
+- Group/ungroup rooms
+- Switch between audio sources
 
 ## Troubleshooting
 
-### mDNS/Avahi Issues
+### Server Issues
 
-If devices are not being discovered on your network:
-1. Ensure the container is running with `network_mode: host`
-2. Check that Avahi daemon is running inside the container
-3. Verify that port 5353/UDP is not blocked by your firewall
+**Container not starting:**
+```bash
+docker logs librespot-snapcast
+```
 
-### Google Cast Not Working
+**Rebuild after changes:**
+```bash
+docker-compose down
+docker-compose up -d --build
+```
 
-If Google Cast devices cannot connect:
-1. Verify PulseAudio is running: `docker exec -it librespot-snapcast ps aux | grep pulseaudio`
-2. Check that port 4713 is accessible from your network
-3. Ensure mDNS/Avahi is working (see above)
-4. Try restarting the container: `docker-compose restart`
+### Client Issues
 
-### Audio Quality Issues
+**No audio from DAC+ Zero:**
+```bash
+# Verify DAC is recognized
+aplay -l
 
-If you experience audio quality problems:
-1. Adjust the buffer size in `snapserver.conf`
-2. Check network latency between server and clients
-3. Ensure sufficient network bandwidth
+# Should show: card 0: sndrpihifiberry
 
-### Spotify Not Appearing
+# Test audio
+speaker-test -c 2 -t wav -D hw:CARD=sndrpihifiberry
+```
 
-If "Spotify Multiroom" doesn't appear in Spotify:
-1. Verify the container is running: `docker ps`
-2. Check container logs: `docker logs librespot-snapcast`
-3. Ensure librespot is running inside the container
+**Client not connecting:**
+```bash
+# Check if server is reachable
+ping <SERVER_IP>
+
+# Check snapclient status
+sudo systemctl status snapclient
+
+# View logs
+sudo journalctl -u snapclient -f
+```
+
+**Audio stuttering on WiFi:**
+```bash
+# Increase latency buffer
+sudo nano /etc/default/snapclient
+# Change to:
+SNAPCLIENT_OPTS="--host <SERVER_IP> --soundcard hw:CARD=sndrpihifiberry --latency 200"
+
+sudo systemctl restart snapclient
+```
+
+## Network Configuration
+
+All devices must be on the same network. For best performance:
+- Use ethernet for the server (Pi 4)
+- WiFi is acceptable for clients (Pi Zero W)
+- Ensure router has good WiFi coverage
+- Reserve IP addresses for all devices in your router
+
+## Advanced Configuration
+
+### Adjusting Audio Quality
+
+Edit `snapserver.conf` to change encoder settings:
+```bash
+nano snapserver.conf
+```
+
+### Multiple Rooms
+
+Repeat the client setup for each room. Each client will appear in the web interface where you can:
+- Name each room
+- Create groups for synchronized playback
+- Adjust individual volumes
+- Apply delay compensation if needed
+
+## Technical Details
+
+### Ports Used
+- 1704: Snapcast server
+- 1705: Snapcast control
+- 1780: Web interface
+- 4713: PulseAudio (Google Cast)
+- 5353: mDNS/Avahi
+
+### Audio Pipeline
+```
+Spotify/AirPlay/Cast → Named Pipes → Snapserver → Network → Snapclients → DAC+ Zero → Speakers
+```
 
 ## Contributing
 
@@ -162,11 +228,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project uses the following open-source components:
-- [Snapcast](https://github.com/badaix/snapcast) - Synchronous multiroom audio player
-- [librespot](https://github.com/librespot-org/librespot) - Open source Spotify client
-- [shairport-sync](https://github.com/mikebrady/shairport-sync) - AirPlay audio receiver
+MIT License - see LICENSE file for details.
 
-## Acknowledgments
-
-Built with open-source components to create a powerful, flexible multiroom audio system.
+This project uses:
+- [Snapcast](https://github.com/badaix/snapcast) - Synchronous multiroom audio
+- [librespot](https://github.com/librespot-org/librespot) - Spotify client
+- [shairport-sync](https://github.com/mikebrady/shairport-sync) - AirPlay receiver
+- [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/) - Google Cast receiver

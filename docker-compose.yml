@@ -16,4 +16,5 @@ services:
       - "1704:1704" # Snapcast server port
       - "1705:1705" # Snapcast control port
       - "1780:1780" # Snapcast HTTP server port
+      - "4713:4713" # PulseAudio port for Google Cast
       - "5353:5353/udp" # Avahi mDNS port

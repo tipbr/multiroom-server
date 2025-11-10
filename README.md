@@ -29,21 +29,14 @@ Flash Raspbian Lite to your Pi 4's SD card and boot it up.
 
 ### 2. Install Docker
 
-```bash
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker pi
-sudo apt-get install -y docker-compose
-```
-
-Log out and back in for group changes to take effect.
+Follow convenience script steps
 
 ### 3. Install the Multiroom Server
 
 ```bash
 git clone https://github.com/tipbr/multiroom-server.git
 cd multiroom-server
-docker-compose up -d
+docker compose up -d
 ```
 
 The server will start and be accessible at `http://<pi4-ip>:1780`
@@ -56,9 +49,9 @@ Flash Raspbian Lite to your Pi Zero's SD card.
 
 ### 2. Configure DAC+ Zero
 
-Edit `/boot/config.txt`:
+Edit `/boot/firmware/config.txt`:
 ```bash
-sudo nano /boot/config.txt
+sudo nano /boot/firmware/config.txt
 ```
 
 Add this line:

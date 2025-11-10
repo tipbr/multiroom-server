@@ -1,11 +1,12 @@
 # Multiroom Audio Server
 
-A Docker-based multiroom audio server supporting multiple streaming protocols including Spotify (via librespot) and AirPlay (via shairport-sync), synchronized across multiple clients using Snapcast.
+A Docker-based multiroom audio server supporting multiple streaming protocols including Spotify (via librespot), AirPlay (via shairport-sync), and Google Cast, synchronized across multiple clients using Snapcast.
 
 ## Features
 
 - 🎵 **Spotify Support** - Stream Spotify to your multiroom setup using librespot
 - 🍎 **AirPlay Support** - Cast from any Apple device using AirPlay (via shairport-sync)
+- 📱 **Google Cast Support** - Cast audio from any Google Cast-enabled app (via PulseAudio)
 - 🔊 **Synchronized Playback** - Perfect audio synchronization across multiple rooms using Snapcast
 - 🌐 **mDNS Discovery** - Automatic device discovery on your network
 - 🐳 **Docker Support** - Easy deployment with Docker and Docker Compose
@@ -54,6 +55,7 @@ services:
       - "1704:1704" # Snapcast server port
       - "1705:1705" # Snapcast control port
       - "1780:1780" # Snapcast HTTP server port
+      - "4713:4713" # PulseAudio port for Google Cast
       - "5353:5353/udp" # Avahi mDNS port
 ```
 
@@ -64,7 +66,7 @@ services:
 The server configuration is managed in `snapserver.conf`. It defines:
 - Bind address and port
 - Log level
-- Audio stream sources (Spotify and AirPlay pipes)
+- Audio stream sources (Spotify, AirPlay, and Google Cast pipes)
 
 ### Client Configuration
 
@@ -78,6 +80,7 @@ The system consists of three main components:
 2. **Audio Sources**:
    - **librespot** - Spotify client that outputs to a named pipe
    - **shairport-sync** - AirPlay receiver that outputs to a named pipe
+   - **PulseAudio** - Google Cast receiver that outputs to a named pipe
 3. **Snapcast Clients** - Devices that receive and play synchronized audio
 
 ## Usage
@@ -94,6 +97,18 @@ The system consists of three main components:
 2. Look for "AirPlay Multiroom" in AirPlay devices
 3. Select it and start streaming
 
+### Google Cast
+
+1. Open any Google Cast-enabled app on your Android/iOS device or Chrome browser
+2. Tap the Cast icon
+3. Look for the server in the list of available devices (it will appear as a network audio device)
+4. Select it and start casting
+
+**Note**: For Google Cast to work, ensure:
+- The server is on the same network as your casting device
+- Port 4713 (PulseAudio) is accessible
+- mDNS/Avahi is functioning properly
+
 ### Web Interface
 
 Access the Snapcast web interface at `http://<server-ip>:1780` to:
@@ -107,6 +122,7 @@ Access the Snapcast web interface at `http://<server-ip>:1780` to:
 - **1704** - Snapcast server port (TCP)
 - **1705** - Snapcast control port (TCP)
 - **1780** - Snapcast HTTP server / Web interface
+- **4713** - PulseAudio network audio (TCP) - for Google Cast
 - **5353** - Avahi mDNS (UDP)
 
 ## Troubleshooting
@@ -117,6 +133,14 @@ If devices are not being discovered on your network:
 1. Ensure the container is running with `network_mode: host`
 2. Check that Avahi daemon is running inside the container
 3. Verify that port 5353/UDP is not blocked by your firewall
+
+### Google Cast Not Working
+
+If Google Cast devices cannot connect:
+1. Verify PulseAudio is running: `docker exec -it librespot-snapcast ps aux | grep pulseaudio`
+2. Check that port 4713 is accessible from your network
+3. Ensure mDNS/Avahi is working (see above)
+4. Try restarting the container: `docker-compose restart`
 
 ### Audio Quality Issues
 

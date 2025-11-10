@@ -27,5 +27,6 @@ This project uses the following open-source components:
 - Snapcast (https://github.com/badaix/snapcast) - GPL-3.0 License
 - librespot (https://github.com/librespot-org/librespot) - MIT License
 - shairport-sync (https://github.com/mikebrady/shairport-sync) - MIT License
+- PulseAudio (https://www.freedesktop.org/wiki/Software/PulseAudio/) - LGPL-2.1 License
 
 Please refer to each component's repository for their respective license terms.

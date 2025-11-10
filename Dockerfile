@@ -65,6 +65,12 @@ RUN echo '#!/bin/bash' > /start.sh \
     && echo '# Kill any existing services that might conflict (from host if using host network)' >> /start.sh \
     && echo 'pkill -9 snapserver 2>/dev/null || true' >> /start.sh \
     && echo 'pkill -9 pulseaudio 2>/dev/null || true' >> /start.sh \
+    && echo 'pkill -9 avahi-daemon 2>/dev/null || true' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Clean up stale PID files from previous runs' >> /start.sh \
+    && echo 'rm -f /run/avahi-daemon/pid 2>/dev/null || true' >> /start.sh \
+    && echo 'rm -f /var/run/pulse/pid 2>/dev/null || true' >> /start.sh \
+    && echo 'rm -f /var/run/pulse/.pid 2>/dev/null || true' >> /start.sh \
     && echo 'sleep 1' >> /start.sh \
     && echo '' >> /start.sh \
     && echo 'mkdir -p /tmp' >> /start.sh \

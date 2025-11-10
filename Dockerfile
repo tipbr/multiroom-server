@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y \
     systemd \
     lsb-release \
     procps \
+    dbus \
     avahi-daemon \
     avahi-utils \
     libnss-mdns \
@@ -51,28 +52,60 @@ RUN echo '[stream]' > /etc/snapserver/snapserver.conf \
 COPY snapserver.service /etc/avahi/services/snapserver.service
 COPY shairport-sync.service /etc/avahi/services/shairport-sync.service
 
-# Create startup script with Avahi, librespot, shairport-sync, and PulseAudio for Google Cast
+# Create startup script with D-Bus, Avahi, librespot, shairport-sync, and PulseAudio for Google Cast
 RUN echo '#!/bin/bash' > /start.sh \
+    && echo 'set -e' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Start D-Bus daemon (required for Avahi and PulseAudio)' >> /start.sh \
+    && echo 'mkdir -p /var/run/dbus' >> /start.sh \
+    && echo 'rm -f /var/run/dbus/pid' >> /start.sh \
+    && echo 'dbus-daemon --system --fork' >> /start.sh \
+    && echo 'sleep 1' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Kill any existing services that might conflict (from host if using host network)' >> /start.sh \
+    && echo 'pkill -9 snapserver 2>/dev/null || true' >> /start.sh \
+    && echo 'pkill -9 pulseaudio 2>/dev/null || true' >> /start.sh \
+    && echo 'pkill -9 avahi-daemon 2>/dev/null || true' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Clean up stale PID files from previous runs' >> /start.sh \
+    && echo 'rm -f /run/avahi-daemon/pid 2>/dev/null || true' >> /start.sh \
+    && echo 'rm -f /var/run/pulse/pid 2>/dev/null || true' >> /start.sh \
+    && echo 'rm -f /var/run/pulse/.pid 2>/dev/null || true' >> /start.sh \
+    && echo 'sleep 1' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo 'mkdir -p /tmp' >> /start.sh \
     && echo '# Create named pipes for audio streams' >> /start.sh \
-    && echo 'mkfifo -m a=rw /tmp/snapfifo-spotify' >> /start.sh \
-    && echo 'mkfifo -m a=rw /tmp/snapfifo-airplay' >> /start.sh \
-    && echo 'mkfifo -m a=rw /tmp/snapfifo-googlecast' >> /start.sh \
-    && echo 'systemctl disable raspotify' >> /start.sh \
+    && echo 'mkfifo -m a=rw /tmp/snapfifo-spotify 2>/dev/null || true' >> /start.sh \
+    && echo 'mkfifo -m a=rw /tmp/snapfifo-airplay 2>/dev/null || true' >> /start.sh \
+    && echo 'mkfifo -m a=rw /tmp/snapfifo-googlecast 2>/dev/null || true' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Disable raspotify systemd service' >> /start.sh \
+    && echo 'systemctl disable raspotify 2>/dev/null || true' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Start Avahi daemon' >> /start.sh \
     && echo 'avahi-daemon --daemonize' >> /start.sh \
+    && echo 'sleep 1' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Create PulseAudio cookie directory to avoid authentication warnings' >> /start.sh \
+    && echo 'mkdir -p /var/run/pulse/.config/pulse' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Start PulseAudio in system mode for Google Cast receiver' >> /start.sh \
     && echo 'pulseaudio --system --disallow-exit --disallow-module-loading=false --exit-idle-time=-1 &' >> /start.sh \
-    && echo 'sleep 1' >> /start.sh \
+    && echo 'sleep 2' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Create PulseAudio sink and pipe to snapcast' >> /start.sh \
     && echo 'pactl load-module module-pipe-sink file=/tmp/snapfifo-googlecast sink_name=snapcast_googlecast format=s16le rate=44100 channels=2 || true' >> /start.sh \
     && echo 'pactl set-default-sink snapcast_googlecast || true' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Start librespot for Spotify' >> /start.sh \
     && echo 'librespot --backend pipe --device /tmp/snapfifo-spotify --name "Spotify Multiroom" &' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Start shairport-sync for AirPlay' >> /start.sh \
     && echo 'shairport-sync -c /etc/shairport-sync.conf &' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Give services time to initialize' >> /start.sh \
     && echo 'sleep 2' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo '# Start snapserver' >> /start.sh \
     && echo 'snapserver -c /etc/snapserver/snapserver.conf' >> /start.sh \
     && chmod +x /start.sh

@@ -62,6 +62,11 @@ RUN echo '#!/bin/bash' > /start.sh \
     && echo 'dbus-daemon --system --fork' >> /start.sh \
     && echo 'sleep 1' >> /start.sh \
     && echo '' >> /start.sh \
+    && echo '# Kill any existing services that might conflict (from host if using host network)' >> /start.sh \
+    && echo 'pkill -9 snapserver 2>/dev/null || true' >> /start.sh \
+    && echo 'pkill -9 pulseaudio 2>/dev/null || true' >> /start.sh \
+    && echo 'sleep 1' >> /start.sh \
+    && echo '' >> /start.sh \
     && echo 'mkdir -p /tmp' >> /start.sh \
     && echo '# Create named pipes for audio streams' >> /start.sh \
     && echo 'mkfifo -m a=rw /tmp/snapfifo-spotify 2>/dev/null || true' >> /start.sh \
@@ -74,6 +79,9 @@ RUN echo '#!/bin/bash' > /start.sh \
     && echo '# Start Avahi daemon' >> /start.sh \
     && echo 'avahi-daemon --daemonize' >> /start.sh \
     && echo 'sleep 1' >> /start.sh \
+    && echo '' >> /start.sh \
+    && echo '# Create PulseAudio cookie directory to avoid authentication warnings' >> /start.sh \
+    && echo 'mkdir -p /var/run/pulse/.config/pulse' >> /start.sh \
     && echo '' >> /start.sh \
     && echo '# Start PulseAudio in system mode for Google Cast receiver' >> /start.sh \
     && echo 'pulseaudio --system --disallow-exit --disallow-module-loading=false --exit-idle-time=-1 &' >> /start.sh \
